@@ -3,7 +3,7 @@
 using namespace std;
 
 int main(int argc, char** argv) {
-
+    /*
     double xbounds[2];
     double ybounds[2];
     double zbounds[2];
@@ -37,4 +37,5 @@ int main(int argc, char** argv) {
         }
     }
     return -1;
+    */
 }

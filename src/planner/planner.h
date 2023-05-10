@@ -56,10 +56,10 @@
 #include <octomap/octomap.h>
 #include <octomap/OcTree.h>
 
-
+#include "Eigen/Dense"
 #include <octomap/AbstractOcTree.h>
-
-
+#include <boost/chrono.hpp>
+#include <unistd.h>
 
 
 namespace ob = ompl::base;
@@ -106,8 +106,11 @@ typedef struct POSE {
 
 class PATH_PLANNER {
     public:
+
+
+
         PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[2] );
-        int plan(double max_t, std::vector<POSE> & poses);
+        int plan(double max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses);
         int optimize_path(std::vector<POSE> poses, std::vector<POSE> & opt_poses);
         int test_pruning(std::vector<POSE> & poses, std::vector<POSE> & opt_poses, std::vector<POSE> & checked_points);
 

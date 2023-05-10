@@ -50,6 +50,7 @@ bool PATH_PLANNER::isStateValid(const ob::State *state) {
         fcl::Vec3f translation(pos->values[0],pos->values[1],pos->values[2]);
         fcl::Quaternion3f rotation(rot->w, rot->x, rot->y, rot->z);
         
+        //TODO: check here!
         fcl::CollisionObject treeObj((_tree_obj));
         fcl::CollisionObject robotObject(_Robot);
 
@@ -136,11 +137,44 @@ int PATH_PLANNER::test_pruning(std::vector<POSE> & poses, std::vector<POSE> & op
     poses[1].position.z = 0.0;
     poses[1].orientation.w = 1.0;
 
-    poses[2].position.x = 10.0;
-    poses[2].position.y = 0.0;
-    poses[2].position.z = 0.0;
+    poses[2].position.x = 3.0;
+    poses[2].position.y = 10.0;
+    poses[2].position.z = 8.0;
     poses[2].orientation.w = 1.0;
 
+    Eigen::Vector3d p0;
+    Eigen::Vector3d p1;
+    Eigen::Vector3d pX;
+    Eigen::Vector3d s;
+
+    double delta = 0.3;
+
+    //Test pruning from point 0->2
+    p0 << poses[0].position.x, poses[0].position.y, poses[0].position.z;
+    p1 << poses[2].position.x, poses[2].position.y, poses[2].position.z;
+    pX = p0;
+
+    s =  (p1-p0);
+    s /= s.norm();
+
+    std::cout << "s: " << s.transpose() << std::endl;
+    POSE cp;
+
+    while( (pX-p1).norm() > delta ) {
+
+        
+
+        pX += s*delta;
+
+        cp.position.x = pX[0];
+        cp.position.y = pX[1];
+        cp.position.z = pX[2];
+
+        checked_points.push_back( cp );
+
+    }
+
+    //checked_points
 
     return 1;
 
@@ -150,30 +184,118 @@ int PATH_PLANNER::test_pruning(std::vector<POSE> & poses, std::vector<POSE> & op
 
 int PATH_PLANNER::optimize_path(std::vector<POSE> poses, std::vector<POSE> & opt_poses) {
 
-    //time based
-    //Removal based
-
-    bool node_remove = true;
+    opt_poses = poses;
     if( poses.size() == 2 ) {
-        opt_poses = poses;
+        std::cout << "[optimization not useful] only 2 points in the path" << std::endl;
+        //opt_poses = poses;
         return 0;
     } //Two poitns 
+    
+    Eigen::Vector3d p0;
+    Eigen::Vector3d p1;
+    Eigen::Vector3d pX;
+    Eigen::Vector3d s;
 
-    while( opt_poses.size() > 2 ) {
+    double delta = 0.2;
+
+    int tries = 5; //just 5 optimization tries (consider elapsed time instead)
+    int ct = 0;
+  
+    fcl::CollisionObject treeObj((_tree_obj));
+    fcl::CollisionObject robotObject(_Robot);
+
+    auto start = boost::chrono::steady_clock::now();
+
+    bool elapsed_time = false;
+    //while( !elapsed_time && opt_poses.size() > 2 ) {
+
+    for ( int i=0; i<opt_poses.size()-1; i++ ) {
+        for ( int j=i+1;j<opt_poses.size(); j++ ) {
+        
+
+        const int i0_range_from     = 0;
+        const float i0_range_to     = opt_poses.size()-1;
+        std::random_device          i0_rand_dev;
+        std::mt19937                i0_generator(i0_rand_dev());
+        std::uniform_int_distribution<int>  i0_distr(i0_range_from, i0_range_to);
+
+        const int i1_range_from     =  0;
+        const float i1_range_to     = opt_poses.size()-1;
+        std::random_device          i1_rand_dev;
+        std::mt19937                i1_generator(i1_rand_dev());
+        std::uniform_int_distribution<int>  i1_distr(i1_range_from, i1_range_to);
 
 
+        int i0;
+        int i1;
+
+        i0 = i0_distr(i0_generator);
+        i1 = i1_distr(i1_generator);
+
+        i0=i;
+        i1=j;
+        std::cout << "Point indeces: " <<  i0 << " " << i1 << std::endl;
+
+        if( i0 == i1 ) {
+            std::cout << "Numeri uguali" << std::endl;
+            continue;
+        }
+        else if(  abs( i0-i1 ) == 1 ) {
+            std::cout << "segmenti contigui" << std::endl;
+            continue;
+        }
+        else {
+            
+            int ptemp;
+            if( i1 < i0 ) {
+                ptemp = i0;
+                i0 = i1;
+                i1 = ptemp;
+            }        
+
+            std::cout << "Size opt poses: " << opt_poses.size() << std::endl;
+
+            p0 << opt_poses[i0].position.x, opt_poses[i0].position.y, opt_poses[i0].position.z;
+            p1 << opt_poses[i1].position.x, opt_poses[i1].position.y, opt_poses[i1].position.z;
+            
+            pX = p0;
+
+            bool obs = false;
+
+            s =  (p1-p0);
+            s /= s.norm();
+            while( (pX-p1).norm() > delta && !obs ) {
+
+                //std::cout << "while!" << std::endl;
+                pX += s*delta;
+
+                if( _tree_obj ) {
+                    fcl::Vec3f translation(pX[0], pX[1], pX[2]);
+                    fcl::Quaternion3f rotation(1, 0, 0, 0);                            
+                    robotObject.setTransform(rotation, translation);
+                    fcl::CollisionRequest requestType(1,false,1,false);
+                    fcl::CollisionResult collisionResult;            
+                    fcl::collide(&robotObject, &treeObj, requestType, collisionResult);
+                 
+                    obs = collisionResult.isCollision();
+                }                
+            }
+
+            if( !obs ) {
+                opt_poses.erase( opt_poses.begin()+i0+1, opt_poses.begin()+i1 );               
+            }
 
 
+        }
+
+        /*
+        auto end = boost::chrono::steady_clock::now();
+        double ms  = boost::chrono::duration_cast<boost::chrono::milliseconds>(end - start).count();
+        //std::cout << "MS: " << ms << std::endl;
+        if ( ms > 1000 ) elapsed_time = true;
+        */
+        }
     } //Do it if you remove at lease one node
-
-
-
-
-
-
-
-
-
 
     return 1;
 
@@ -182,7 +304,7 @@ int PATH_PLANNER::optimize_path(std::vector<POSE> poses, std::vector<POSE> & opt
 
 
 
-int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses) {
+int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
 
     //Planner not correctly initialized
     if( !_start_state_set || !_goal_state_set ) {
@@ -234,6 +356,9 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses) {
     
     ob::PlannerStatus solved = _planner->solve(max_t);
 
+
+    //std::vector<POSE> opt_poses;
+
     if( solved ) {
     
         ob::PathPtr path = _pdef->getSolutionPath();
@@ -262,6 +387,23 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses) {
             poses[path_idx].orientation.z = rot->z;
             poses[path_idx].orientation.w = rot->w;		
 		}
+
+
+        optimize_path(poses, opt_poses);
+        //opt_poses = poses;
+
+
+        std::cout << "Pre-after optimization" << std::endl;
+
+        std::cout << "Full path: " << poses.size() << std::endl;
+        for ( int i=0; i<poses.size(); i++ ) {
+            std::cout << "[" << i << "]: (" << poses[i].position.x << " " << poses[i].position.y << " " << poses[i].position.z << ")" << std::endl;
+        }
+
+        std::cout << "Optimized path: " << opt_poses.size() << std::endl;
+        for ( int i=0; i<opt_poses.size(); i++ ) {
+            std::cout << "[" << i << "]: (" << opt_poses[i].position.x << " " << opt_poses[i].position.y << " " << opt_poses[i].position.z << ")" << std::endl;
+        }
     }
     reset_planner();
 
