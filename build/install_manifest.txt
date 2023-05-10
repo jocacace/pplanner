@@ -1,2 +1,0 @@
-/usr/lib/lib3dPathPlanner.so
-/usr/include/3dPathPlanner/planner.h

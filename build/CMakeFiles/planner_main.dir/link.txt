@@ -1,1 +1,0 @@
-/usr/bin/c++     CMakeFiles/planner_main.dir/src/main.cpp.o  -o planner_main  -Wl,-rpath,/home/dev/leo_ws/src/pplanner/build lib3dPathPlanner.so -lompl -lfcl 
