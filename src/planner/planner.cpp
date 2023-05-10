@@ -34,10 +34,19 @@
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
-
+/**
+ * \brief Check the validity of a sample state.
+ *
+ * This function takes a sample state to validate if it is free or not
+ * It is called directly from the OMPL framework and used an OctoTree along with the FCL libraries to validate the state
+ * 
+ * \param state: an SE(3) ompl state  
+ * \return The state validity (true: free state) or (false: occupied state)
+ */
 bool PATH_PLANNER::isStateValid(const ob::State *state) {
     
     if( _tree_obj ) {
+
         // cast the abstract state type to the type we expect
         const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
 
@@ -47,14 +56,14 @@ bool PATH_PLANNER::isStateValid(const ob::State *state) {
         // extract the second component of the state and cast it to what we expect
         const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
             
+        // set the rototranslation of the robot considering the planned state
         fcl::Vec3f translation(pos->values[0],pos->values[1],pos->values[2]);
         fcl::Quaternion3f rotation(rot->w, rot->x, rot->y, rot->z);
-        
-        //TODO: check here!
+
+        // check collisions between the octomap and the robot shape      
         fcl::CollisionObject treeObj((_tree_obj));
         fcl::CollisionObject robotObject(_Robot);
-
-        
+            
         robotObject.setTransform(rotation, translation);
         fcl::CollisionRequest requestType(1,false,1,false);
         fcl::CollisionResult collisionResult;
@@ -64,7 +73,7 @@ bool PATH_PLANNER::isStateValid(const ob::State *state) {
     }
     else {        
         return true;
-    }
+    } // No map available, return a valid state in anycase
 }
 
 /** Return an optimization objective which attempts to steer the robot
@@ -93,7 +102,15 @@ ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInforma
 	return obj;
 }
 
-
+/**
+ * \brief PATH_PLANNER constructor.
+ *
+ * This function instantiate an object of PATH_PLANNER type
+ * 
+ * \param xbounds: workspace bounds toward x axis
+ * \param xbounds: workspace bounds toward y axis
+ * \param xbounds: workspace bounds toward z axis
+ */
 PATH_PLANNER::PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[2] ) {
   
     std::cout << "---Initializing OMPL path planner---" << std::endl;
@@ -114,159 +131,56 @@ PATH_PLANNER::PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[
 	_si = ob::SpaceInformationPtr(new ob::SpaceInformation(_space));
 	_si->setStateValidityChecker(std::bind(&PATH_PLANNER::isStateValid, this, std::placeholders::_1 ));
 	_pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(_si));    
-	//_pdef->setOptimizationObjective(getPathLengthObjWithCostToGo(_si));
+
     _pdef->setOptimizationObjective( getClearanceObjective(_si) );
     //_pdef->setOptimizationObjective( getThresholdPathLengthObj( _si ));
 
     _planner = ob::PlannerPtr(new og::RRTstar(_si));    
-	//_Robot = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(r_dim[0], r_dim[1], r_dim[2]));
-
+    
 	std::cout << "---Planner initialized!---" << std::endl;
 }
 
-int PATH_PLANNER::test_pruning(std::vector<POSE> & poses, std::vector<POSE> & opt_poses, std::vector<POSE> & checked_points ) {
 
-    poses.resize(3);
-    poses[0].position.x = 0.0;
-    poses[0].position.y = 0.0;
-    poses[0].position.z = 0.0;
-    poses[0].orientation.w = 1.0;
-
-    poses[1].position.x = 5.0;
-    poses[1].position.y = 5.0;
-    poses[1].position.z = 0.0;
-    poses[1].orientation.w = 1.0;
-
-    poses[2].position.x = 3.0;
-    poses[2].position.y = 10.0;
-    poses[2].position.z = 8.0;
-    poses[2].orientation.w = 1.0;
-
-    Eigen::Vector3d p0;
-    Eigen::Vector3d p1;
-    Eigen::Vector3d pX;
-    Eigen::Vector3d s;
-
-    double delta = 0.3;
-
-    //Test pruning from point 0->2
-    p0 << poses[0].position.x, poses[0].position.y, poses[0].position.z;
-    p1 << poses[2].position.x, poses[2].position.y, poses[2].position.z;
-    pX = p0;
-
-    s =  (p1-p0);
-    s /= s.norm();
-
-    std::cout << "s: " << s.transpose() << std::endl;
-    POSE cp;
-
-    while( (pX-p1).norm() > delta ) {
-
-        
-
-        pX += s*delta;
-
-        cp.position.x = pX[0];
-        cp.position.y = pX[1];
-        cp.position.z = pX[2];
-
-        checked_points.push_back( cp );
-
-    }
-
-    //checked_points
-
-    return 1;
-
-}
-
-
-
-int PATH_PLANNER::optimize_path(std::vector<POSE> poses, std::vector<POSE> & opt_poses) {
+/**
+ * \brief This function optimies the path planned by the plan function. 
+ * It checks all the points in sequence that don't contains obstacles in the middle, removing them
+ * 
+ * \param poses: the full not-optimized path
+ * \param delta: the space interval to check two valid points of the path
+ * \return int: not used
+ */
+int PATH_PLANNER::optimize_path(std::vector<POSE> poses, double delta, std::vector<POSE> & opt_poses) {
 
     opt_poses = poses;
     if( poses.size() == 2 ) {
-        std::cout << "[optimization not useful] only 2 points in the path" << std::endl;
-        //opt_poses = poses;
+        std::cout << "[optimization not useful] only 2 points in the path" << std::endl;        
         return 0;
-    } //Two poitns 
+    } //Two point, it is already an optimized path
     
     Eigen::Vector3d p0;
     Eigen::Vector3d p1;
     Eigen::Vector3d pX;
     Eigen::Vector3d s;
-
-    double delta = 0.2;
-
-    int tries = 5; //just 5 optimization tries (consider elapsed time instead)
-    int ct = 0;
   
     fcl::CollisionObject treeObj((_tree_obj));
     fcl::CollisionObject robotObject(_Robot);
 
-    auto start = boost::chrono::steady_clock::now();
-
-    bool elapsed_time = false;
-    //while( !elapsed_time && opt_poses.size() > 2 ) {
-
     for ( int i=0; i<opt_poses.size()-1; i++ ) {
-        for ( int j=i+1;j<opt_poses.size(); j++ ) {
+        for ( int j=i+2;j<opt_poses.size(); j++ ) {
+    
+            int i0=i;
+            int i1=j;
         
-
-        const int i0_range_from     = 0;
-        const float i0_range_to     = opt_poses.size()-1;
-        std::random_device          i0_rand_dev;
-        std::mt19937                i0_generator(i0_rand_dev());
-        std::uniform_int_distribution<int>  i0_distr(i0_range_from, i0_range_to);
-
-        const int i1_range_from     =  0;
-        const float i1_range_to     = opt_poses.size()-1;
-        std::random_device          i1_rand_dev;
-        std::mt19937                i1_generator(i1_rand_dev());
-        std::uniform_int_distribution<int>  i1_distr(i1_range_from, i1_range_to);
-
-
-        int i0;
-        int i1;
-
-        i0 = i0_distr(i0_generator);
-        i1 = i1_distr(i1_generator);
-
-        i0=i;
-        i1=j;
-        std::cout << "Point indeces: " <<  i0 << " " << i1 << std::endl;
-
-        if( i0 == i1 ) {
-            std::cout << "Numeri uguali" << std::endl;
-            continue;
-        }
-        else if(  abs( i0-i1 ) == 1 ) {
-            std::cout << "segmenti contigui" << std::endl;
-            continue;
-        }
-        else {
-            
-            int ptemp;
-            if( i1 < i0 ) {
-                ptemp = i0;
-                i0 = i1;
-                i1 = ptemp;
-            }        
-
-            std::cout << "Size opt poses: " << opt_poses.size() << std::endl;
-
             p0 << opt_poses[i0].position.x, opt_poses[i0].position.y, opt_poses[i0].position.z;
-            p1 << opt_poses[i1].position.x, opt_poses[i1].position.y, opt_poses[i1].position.z;
-            
+            p1 << opt_poses[i1].position.x, opt_poses[i1].position.y, opt_poses[i1].position.z;    
             pX = p0;
 
             bool obs = false;
 
             s =  (p1-p0);
             s /= s.norm();
-            while( (pX-p1).norm() > delta && !obs ) {
 
-                //std::cout << "while!" << std::endl;
+            while( (pX-p1).norm() > delta && !obs ) {
                 pX += s*delta;
 
                 if( _tree_obj ) {
@@ -284,26 +198,19 @@ int PATH_PLANNER::optimize_path(std::vector<POSE> poses, std::vector<POSE> & opt
             if( !obs ) {
                 opt_poses.erase( opt_poses.begin()+i0+1, opt_poses.begin()+i1 );               
             }
-
-
         }
-
-        /*
-        auto end = boost::chrono::steady_clock::now();
-        double ms  = boost::chrono::duration_cast<boost::chrono::milliseconds>(end - start).count();
-        //std::cout << "MS: " << ms << std::endl;
-        if ( ms > 1000 ) elapsed_time = true;
-        */
-        }
-    } //Do it if you remove at lease one node
-
+    }
     return 1;
-
 }
 
-
-
-
+/**
+ * \brief This function plans the path
+ * 
+ * \param max_t: maximum planning time in seconds
+ * \return poses: the not-optimized path
+ * \return opt_poses: the optimized path 
+ * \return int: planned path (1-solved, 0-not solved)
+ */
 int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
 
     //Planner not correctly initialized
@@ -356,9 +263,6 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE
     
     ob::PlannerStatus solved = _planner->solve(max_t);
 
-
-    //std::vector<POSE> opt_poses;
-
     if( solved ) {
     
         ob::PathPtr path = _pdef->getSolutionPath();
@@ -389,25 +293,9 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE
 		}
 
 
-        optimize_path(poses, opt_poses);
-        //opt_poses = poses;
-
-
-        std::cout << "Pre-after optimization" << std::endl;
-
-        std::cout << "Full path: " << poses.size() << std::endl;
-        for ( int i=0; i<poses.size(); i++ ) {
-            std::cout << "[" << i << "]: (" << poses[i].position.x << " " << poses[i].position.y << " " << poses[i].position.z << ")" << std::endl;
-        }
-
-        std::cout << "Optimized path: " << opt_poses.size() << std::endl;
-        for ( int i=0; i<opt_poses.size(); i++ ) {
-            std::cout << "[" << i << "]: (" << opt_poses[i].position.x << " " << opt_poses[i].position.y << " " << opt_poses[i].position.z << ")" << std::endl;
-        }
+        optimize_path(poses, _delta, opt_poses);
     }
     reset_planner();
 
-    //Return -1: wrong settings, 1: planned succeded, 0: no plan found
-    return (solved) ? 1 : 0;
-    
+    return (solved) ? 1 : 0;    
 }

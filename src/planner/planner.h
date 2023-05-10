@@ -111,7 +111,7 @@ class PATH_PLANNER {
 
         PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[2] );
         int plan(double max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses);
-        int optimize_path(std::vector<POSE> poses, std::vector<POSE> & opt_poses);
+        int optimize_path(std::vector<POSE> poses, double delta, std::vector<POSE> & opt_poses);
         int test_pruning(std::vector<POSE> & poses, std::vector<POSE> & opt_poses, std::vector<POSE> & checked_points);
 
         bool isStateValid(const ob::State *state);
@@ -121,12 +121,22 @@ class PATH_PLANNER {
             if( !_random_goal_state ) _goal_state_set = false;
         }
         
+        /**
+         * \brief This function is used to set the start state
+         * 
+         * \param s: position and orientation of the start state         
+         */
         void set_start_state( POSE s) {
             _start = s;
             _random_start_state = false;
             _start_state_set = true;
         }
 
+         /**
+         * \brief This function is used to set the goal state
+         * 
+         * \param g: position and orientation of the goal state         
+         */
         void set_goal_state( POSE g) {
             _goal = g;
             _random_goal_state = false;
@@ -149,16 +159,34 @@ class PATH_PLANNER {
             _random_goal_state = true;
             _goal_state_set = true;
         }
+
+         /**
+         * \brief This function is used to set the geometry of the robot as a rectangle
+         * 
+         * \param box_dim: the dimension of the box (x,y,z)
+         */
         void set_robot_geometry(float box_dim[3] ) {
             _Robot = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(box_dim[0], box_dim[1], box_dim[2]));
             _rgeometry_set = true;
         }
 
+
+         /**
+         * \brief This function is used to set the geometry of the robot as a sphere
+         * 
+         * \param robot_radius: the radius of the robot
+         */
         void set_robot_geometry(float robot_radius ) {
             _Robot = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Sphere(robot_radius));
             _rgeometry_set = true;
         }
 
+
+         /**
+         * \brief This function is used to set the environment map
+         * 
+         * \param t: the OcTtee (an octomap::OcTree)
+         */
         void set_octo_tree(octomap::OcTree* t ) {
 
             fcl::OcTree* tree = new fcl::OcTree(std::shared_ptr<const octomap::OcTree>(t));
@@ -173,6 +201,7 @@ class PATH_PLANNER {
         bool _random_goal_state = false;
 		bool _verbose = false;
         bool _rgeometry_set = false;
+        double _delta = 0.2; //Todo: make a param
 
         ob::StateSpacePtr _space;
   		ob::SpaceInformationPtr _si;
