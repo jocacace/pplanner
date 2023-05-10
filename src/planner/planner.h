@@ -39,6 +39,8 @@
 
 #include <ompl/geometric/planners/rrt/InformedRRTstar.h>
 #include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/geometric/planners/rrt/RRTXstatic.h>
+
 
 #include "fcl/shape/geometric_shapes.h"
 #include "fcl/narrowphase/narrowphase.h"
@@ -53,6 +55,10 @@
 #include <octomap/ColorOcTree.h>
 #include <octomap/octomap.h>
 #include <octomap/OcTree.h>
+
+
+#include <octomap/AbstractOcTree.h>
+
 
 
 
@@ -100,8 +106,11 @@ typedef struct POSE {
 
 class PATH_PLANNER {
     public:
-        PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[2]);
+        PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[2] );
         int plan(double max_t, std::vector<POSE> & poses);
+        int optimize_path(std::vector<POSE> poses, std::vector<POSE> & opt_poses);
+        int test_pruning(std::vector<POSE> & poses, std::vector<POSE> & opt_poses, std::vector<POSE> & checked_points);
+
         bool isStateValid(const ob::State *state);
 
         void reset_planner() {
@@ -137,9 +146,21 @@ class PATH_PLANNER {
             _random_goal_state = true;
             _goal_state_set = true;
         }
+        void set_robot_geometry(float box_dim[3] ) {
+            _Robot = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(box_dim[0], box_dim[1], box_dim[2]));
+            _rgeometry_set = true;
+        }
+
+        void set_robot_geometry(float robot_radius ) {
+            _Robot = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Sphere(robot_radius));
+            _rgeometry_set = true;
+        }
+
         void set_octo_tree(octomap::OcTree* t ) {
+
             fcl::OcTree* tree = new fcl::OcTree(std::shared_ptr<const octomap::OcTree>(t));
             _tree_obj = std::shared_ptr<fcl::CollisionGeometry>(tree);
+            
         }
 
     private:
@@ -148,6 +169,7 @@ class PATH_PLANNER {
         bool _random_start_state = false;
         bool _random_goal_state = false;
 		bool _verbose = false;
+        bool _rgeometry_set = false;
 
         ob::StateSpacePtr _space;
   		ob::SpaceInformationPtr _si;

@@ -7,7 +7,11 @@ int main(int argc, char** argv) {
     double xbounds[2];
     double ybounds[2];
     double zbounds[2];
+    double rdim[3];
 
+    rdim[0] = 0.3;
+    rdim[1] = 0.3;
+    rdim[2] = 0.3;
     xbounds[0] = -20.0;
     xbounds[1] =  20.0;
     ybounds[0] = -20.0;

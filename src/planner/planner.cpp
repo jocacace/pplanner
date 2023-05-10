@@ -37,29 +37,33 @@ namespace og = ompl::geometric;
 
 bool PATH_PLANNER::isStateValid(const ob::State *state) {
     
-    // cast the abstract state type to the type we expect
-	const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
+    if( _tree_obj ) {
+        // cast the abstract state type to the type we expect
+        const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
 
-	// extract the first component of the state and cast it to what we expect
-	const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
+        // extract the first component of the state and cast it to what we expect
+        const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
 
-	// extract the second component of the state and cast it to what we expect
-	const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+        // extract the second component of the state and cast it to what we expect
+        const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+            
+        fcl::Vec3f translation(pos->values[0],pos->values[1],pos->values[2]);
+        fcl::Quaternion3f rotation(rot->w, rot->x, rot->y, rot->z);
         
-    fcl::Vec3f translation(pos->values[0],pos->values[1],pos->values[2]);
-	fcl::Quaternion3f rotation(rot->w, rot->x, rot->y, rot->z);
-	  
-	fcl::CollisionObject treeObj((_tree_obj));
-	fcl::CollisionObject robotObject(_Robot);
+        fcl::CollisionObject treeObj((_tree_obj));
+        fcl::CollisionObject robotObject(_Robot);
 
-	
-	robotObject.setTransform(rotation, translation);
-	fcl::CollisionRequest requestType(1,false,1,false);
-	fcl::CollisionResult collisionResult;
-	fcl::collide(&robotObject, &treeObj, requestType, collisionResult);
+        
+        robotObject.setTransform(rotation, translation);
+        fcl::CollisionRequest requestType(1,false,1,false);
+        fcl::CollisionResult collisionResult;
+        fcl::collide(&robotObject, &treeObj, requestType, collisionResult);
 
-	return(!collisionResult.isCollision());
-    
+        return(!collisionResult.isCollision());
+    }
+    else {        
+        return true;
+    }
 }
 
 /** Return an optimization objective which attempts to steer the robot
@@ -89,7 +93,7 @@ ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInforma
 }
 
 
-PATH_PLANNER::PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[2]) {
+PATH_PLANNER::PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[2] ) {
   
     std::cout << "---Initializing OMPL path planner---" << std::endl;
 	_space = ob::StateSpacePtr(new ob::SE3StateSpace());
@@ -109,23 +113,88 @@ PATH_PLANNER::PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[
 	_si = ob::SpaceInformationPtr(new ob::SpaceInformation(_space));
 	_si->setStateValidityChecker(std::bind(&PATH_PLANNER::isStateValid, this, std::placeholders::_1 ));
 	_pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(_si));    
-	_pdef->setOptimizationObjective(getPathLengthObjWithCostToGo(_si));
-    //_pdef->setOptimizationObjective( getClearanceObjective(_si) );
+	//_pdef->setOptimizationObjective(getPathLengthObjWithCostToGo(_si));
+    _pdef->setOptimizationObjective( getClearanceObjective(_si) );
     //_pdef->setOptimizationObjective( getThresholdPathLengthObj( _si ));
 
-    _planner = ob::PlannerPtr(new og::RRTstar(_si));
-	_Robot = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(0.3, 0.3, 0.1));
+    _planner = ob::PlannerPtr(new og::RRTstar(_si));    
+	//_Robot = std::shared_ptr<fcl::CollisionGeometry>(new fcl::Box(r_dim[0], r_dim[1], r_dim[2]));
 
 	std::cout << "---Planner initialized!---" << std::endl;
 }
+
+int PATH_PLANNER::test_pruning(std::vector<POSE> & poses, std::vector<POSE> & opt_poses, std::vector<POSE> & checked_points ) {
+
+    poses.resize(3);
+    poses[0].position.x = 0.0;
+    poses[0].position.y = 0.0;
+    poses[0].position.z = 0.0;
+    poses[0].orientation.w = 1.0;
+
+    poses[1].position.x = 5.0;
+    poses[1].position.y = 5.0;
+    poses[1].position.z = 0.0;
+    poses[1].orientation.w = 1.0;
+
+    poses[2].position.x = 10.0;
+    poses[2].position.y = 0.0;
+    poses[2].position.z = 0.0;
+    poses[2].orientation.w = 1.0;
+
+
+    return 1;
+
+}
+
+
+
+int PATH_PLANNER::optimize_path(std::vector<POSE> poses, std::vector<POSE> & opt_poses) {
+
+    //time based
+    //Removal based
+
+    bool node_remove = true;
+    if( poses.size() == 2 ) {
+        opt_poses = poses;
+        return 0;
+    } //Two poitns 
+
+    while( opt_poses.size() > 2 ) {
+
+
+
+
+    } //Do it if you remove at lease one node
+
+
+
+
+
+
+
+
+
+
+    return 1;
+
+}
+
 
 
 
 int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses) {
 
     //Planner not correctly initialized
-    if( !_start_state_set || !_goal_state_set ) return -1;
-        
+    if( !_start_state_set || !_goal_state_set ) {
+        std::cout << "Problem not correctly set: start or goal state not defined!" << std::endl;
+        return -1;
+    }
+
+    if( !_rgeometry_set ) {
+        std::cout << "Problem not correctly set: robot geometry not specified!" << std::endl;
+        return -1;
+    }
+
     ob::ScopedState<ob::SE3StateSpace> start(_space);		
     ob::ScopedState<ob::SE3StateSpace> goal(_space);
     
