@@ -115,6 +115,7 @@ class PATH_PLANNER {
         int test_pruning(std::vector<POSE> & poses, std::vector<POSE> & opt_poses, std::vector<POSE> & checked_points);
 
         bool isStateValid(const ob::State *state);
+        bool check_path( POSE p0, std::vector<POSE> poses );
 
         void reset_planner() {
             if( !_random_start_state ) _start_state_set = false;

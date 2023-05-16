@@ -165,9 +165,9 @@ int PATH_PLANNER::optimize_path(std::vector<POSE> poses, double delta, std::vect
     fcl::CollisionObject treeObj((_tree_obj));
     fcl::CollisionObject robotObject(_Robot);
 
+
     for ( int i=0; i<opt_poses.size()-1; i++ ) {
-        for ( int j=i+2;j<opt_poses.size(); j++ ) {
-    
+        for ( int j=i+1;j<opt_poses.size(); j++ ) {
             int i0=i;
             int i1=j;
         
@@ -197,10 +197,90 @@ int PATH_PLANNER::optimize_path(std::vector<POSE> poses, double delta, std::vect
 
             if( !obs ) {
                 opt_poses.erase( opt_poses.begin()+i0+1, opt_poses.begin()+i1 );               
+                //if( i>0) i--;
             }
         }
     }
     return 1;
+}
+
+
+bool PATH_PLANNER::check_path( POSE p0, std::vector<POSE> poses ) {
+
+
+    Eigen::Vector3d pi;
+    Eigen::Vector3d p1;
+    Eigen::Vector3d pX;
+    Eigen::Vector3d s;
+  
+    //fcl::CollisionObject treeObj((_tree_obj));
+    //fcl::CollisionObject robotObject(_Robot);
+
+    bool obs = false;
+    int i=0;
+
+    pi << p0.position.x, p0.position.y, p0.position.z;
+
+
+
+    s =  (p1-p0);
+    s /= s.norm();
+
+    while( i<poses.size()-1 && !obs ) {
+
+        p1 << opt_poses[i].position.x, opt_poses[i].position.y, opt_poses[i].position.z;
+
+        cout << (p1-p0).norm() << endl;
+
+
+
+        //i++;
+    }
+    /*
+    for ( int i=0; i<poses.size(); i++ ) {
+
+
+
+
+            int i0=i;
+            int i1=j;
+        
+            p0 << opt_poses[i0].position.x, opt_poses[i0].position.y, opt_poses[i0].position.z;
+            p1 << opt_poses[i1].position.x, opt_poses[i1].position.y, opt_poses[i1].position.z;    
+            pX = p0;
+
+            bool obs = false;
+
+            s =  (p1-p0);
+            s /= s.norm();
+
+            while( (pX-p1).norm() > delta && !obs ) {
+                pX += s*delta;
+
+                if( _tree_obj ) {
+                    fcl::Vec3f translation(pX[0], pX[1], pX[2]);
+                    fcl::Quaternion3f rotation(1, 0, 0, 0);                            
+                    robotObject.setTransform(rotation, translation);
+                    fcl::CollisionRequest requestType(1,false,1,false);
+                    fcl::CollisionResult collisionResult;            
+                    fcl::collide(&robotObject, &treeObj, requestType, collisionResult);
+                 
+                    obs = collisionResult.isCollision();
+                }                
+            }
+
+            if( !obs ) {
+                opt_poses.erase( opt_poses.begin()+i0+1, opt_poses.begin()+i1 );               
+                //if( i>0) i--;
+            }
+        }
+    }
+    */
+
+
+   if( obs ) return false;
+   else return true;
+
 }
 
 /**
@@ -247,6 +327,7 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE
         goal->rotation().z = _goal.orientation.z;
     }  
     
+    
     _pdef->clearGoal();
     _pdef->clearStartStates();
     _pdef->clearSolutionPaths();
@@ -261,6 +342,8 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE
     if( _verbose ) _si->printSettings(std::cout);
 	if( _verbose ) _pdef->print(std::cout);
     
+
+    //_planner->setRange(1.0);    
     ob::PlannerStatus solved = _planner->solve(max_t);
 
     if( solved ) {
