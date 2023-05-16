@@ -207,7 +207,7 @@ int PATH_PLANNER::optimize_path(std::vector<POSE> poses, double delta, std::vect
 
 bool PATH_PLANNER::check_path( POSE p0, std::vector<POSE> poses ) {
 
-
+/*
     Eigen::Vector3d pi;
     Eigen::Vector3d p1;
     Eigen::Vector3d pX;
@@ -277,10 +277,11 @@ bool PATH_PLANNER::check_path( POSE p0, std::vector<POSE> poses ) {
     }
     */
 
-
+/*
    if( obs ) return false;
    else return true;
 
+*/
 }
 
 /**
