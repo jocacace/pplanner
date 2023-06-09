@@ -106,16 +106,24 @@ ob::OptimizationObjectivePtr getPathLengthObjWithCostToGo(const ob::SpaceInforma
  * \brief PATH_PLANNER constructor.
  *
  * This function instantiate an object of PATH_PLANNER type
+ *
+ */
+PATH_PLANNER::PATH_PLANNER( ) {}
+
+/**
+ * \brief Init function.
+ *
+ * This function initialize all the stuff needed to plan
  * 
  * \param xbounds: workspace bounds toward x axis
  * \param xbounds: workspace bounds toward y axis
  * \param xbounds: workspace bounds toward z axis
  */
-PATH_PLANNER::PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[2] ) {
-  
-    std::cout << "---Initializing OMPL path planner---" << std::endl;
-	_space = ob::StateSpacePtr(new ob::SE3StateSpace());
+void PATH_PLANNER::init( const double * xbounds, const double * ybounds, const double * zbounds ) {
 
+    std::cout << "---Initializing OMPL path planner---" << std::endl;
+
+	_space = ob::StateSpacePtr(new ob::SE3StateSpace());
 	ob::RealVectorBounds bounds(3);
 
 	bounds.setLow (0,  xbounds[0]);
@@ -138,6 +146,7 @@ PATH_PLANNER::PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[
     _planner = ob::PlannerPtr(new og::RRTstar(_si));    
     
 	std::cout << "---Planner initialized!---" << std::endl;
+
 }
 
 
@@ -149,7 +158,7 @@ PATH_PLANNER::PATH_PLANNER(double xbounds[2], double ybounds[2], double zbounds[
  * \param delta: the space interval to check two valid points of the path
  * \return int: not used
  */
-int PATH_PLANNER::optimize_path(std::vector<POSE> poses, double delta, std::vector<POSE> & opt_poses) {
+int PATH_PLANNER::optimize_path(const std::vector<POSE> poses, const double  delta, std::vector<POSE> & opt_poses) {
 
     opt_poses = poses;
     if( poses.size() == 2 ) {
