@@ -34,6 +34,32 @@
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
+
+bool PATH_PLANNER::check_state( const double * s ) {
+
+  if( _tree_obj ) {
+      
+        // set the rototranslation of the robot considering the planned state
+        fcl::Vec3f translation(s[0], s[1], s[2]);
+        fcl::Quaternion3f rotation(1.0, 0.0, 0.0, 0.0);
+
+        // check collisions between the octomap and the robot shape      
+        fcl::CollisionObject treeObj((_tree_obj));
+        fcl::CollisionObject robotObject(_Robot);
+            
+        robotObject.setTransform(rotation, translation);
+        fcl::CollisionRequest requestType(1,false,1,false);
+        fcl::CollisionResult collisionResult;
+        fcl::collide(&robotObject, &treeObj, requestType, collisionResult);
+
+        return(!collisionResult.isCollision());
+    }
+    else {        
+        return true;
+    } // No map available, return a valid state in anycase
+}
+
+
 /**
  * \brief Check the validity of a sample state.
  *
@@ -158,7 +184,7 @@ void PATH_PLANNER::init( const double * xbounds, const double * ybounds, const d
  * \param delta: the space interval to check two valid points of the path
  * \return int: not used
  */
-int PATH_PLANNER::optimize_path(const std::vector<POSE> poses, const double  delta, std::vector<POSE> & opt_poses) {
+int PATH_PLANNER::optimize_path(const std::vector<POSE> & poses, const double delta, std::vector<POSE> & opt_poses) {
 
     opt_poses = poses;
     if( poses.size() == 2 ) {
@@ -214,85 +240,6 @@ int PATH_PLANNER::optimize_path(const std::vector<POSE> poses, const double  del
 }
 
 
-bool PATH_PLANNER::check_path( POSE p0, std::vector<POSE> poses ) {
-
-/*
-    Eigen::Vector3d pi;
-    Eigen::Vector3d p1;
-    Eigen::Vector3d pX;
-    Eigen::Vector3d s;
-  
-    //fcl::CollisionObject treeObj((_tree_obj));
-    //fcl::CollisionObject robotObject(_Robot);
-
-    bool obs = false;
-    int i=0;
-
-    pi << p0.position.x, p0.position.y, p0.position.z;
-
-
-
-    s =  (p1-p0);
-    s /= s.norm();
-
-    while( i<poses.size()-1 && !obs ) {
-
-        p1 << opt_poses[i].position.x, opt_poses[i].position.y, opt_poses[i].position.z;
-
-        cout << (p1-p0).norm() << endl;
-
-
-
-        //i++;
-    }
-    /*
-    for ( int i=0; i<poses.size(); i++ ) {
-
-
-
-
-            int i0=i;
-            int i1=j;
-        
-            p0 << opt_poses[i0].position.x, opt_poses[i0].position.y, opt_poses[i0].position.z;
-            p1 << opt_poses[i1].position.x, opt_poses[i1].position.y, opt_poses[i1].position.z;    
-            pX = p0;
-
-            bool obs = false;
-
-            s =  (p1-p0);
-            s /= s.norm();
-
-            while( (pX-p1).norm() > delta && !obs ) {
-                pX += s*delta;
-
-                if( _tree_obj ) {
-                    fcl::Vec3f translation(pX[0], pX[1], pX[2]);
-                    fcl::Quaternion3f rotation(1, 0, 0, 0);                            
-                    robotObject.setTransform(rotation, translation);
-                    fcl::CollisionRequest requestType(1,false,1,false);
-                    fcl::CollisionResult collisionResult;            
-                    fcl::collide(&robotObject, &treeObj, requestType, collisionResult);
-                 
-                    obs = collisionResult.isCollision();
-                }                
-            }
-
-            if( !obs ) {
-                opt_poses.erase( opt_poses.begin()+i0+1, opt_poses.begin()+i1 );               
-                //if( i>0) i--;
-            }
-        }
-    }
-    */
-
-/*
-   if( obs ) return false;
-   else return true;
-
-*/
-}
-
 /**
  * \brief This function plans the path
  * 
@@ -301,7 +248,7 @@ bool PATH_PLANNER::check_path( POSE p0, std::vector<POSE> poses ) {
  * \return opt_poses: the optimized path 
  * \return int: planned path (1-solved, 0-not solved)
  */
-int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
+int PATH_PLANNER::plan(const double & max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
 
     //Planner not correctly initialized
     if( !_start_state_set || !_goal_state_set ) {
@@ -351,9 +298,7 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE
 
     if( _verbose ) _si->printSettings(std::cout);
 	if( _verbose ) _pdef->print(std::cout);
-    
-
-    //_planner->setRange(1.0);    
+      
     ob::PlannerStatus solved = _planner->solve(max_t);
 
     if( solved ) {
@@ -365,9 +310,9 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE
         
         poses.resize( pth->getStateCount () );
 
-        for (std::size_t path_idx = 0; path_idx < pth->getStateCount (); path_idx++) {
+        //for (std::size_t path_idx = 0; path_idx < pth->getStateCount (); path_idx++) {
+        for ( auto path_idx = 0; path_idx < pth->getStateCount (); path_idx++) {
 		
-
         	const ob::SE3StateSpace::StateType *se3state = pth->getState(path_idx)->as<ob::SE3StateSpace::StateType>();
 			// extract the first component of the state and cast it to what we expect
 			const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
@@ -385,9 +330,9 @@ int PATH_PLANNER::plan(double max_t, std::vector<POSE> & poses, std::vector<POSE
             poses[path_idx].orientation.w = rot->w;		
 		}
 
-
         optimize_path(poses, _delta, opt_poses);
     }
+
     reset_planner();
 
     return (solved) ? 1 : 0;    

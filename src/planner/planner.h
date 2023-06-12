@@ -111,10 +111,10 @@ class PATH_PLANNER {
 
         PATH_PLANNER();
         void init( const double * xbounds, const double * ybounds, const double * zbounds);
-        int plan(double max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses);
-        int optimize_path(const std::vector<POSE> poses, const double delta, std::vector<POSE> & opt_poses);
+        int plan(const double & max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses);
+        int optimize_path(const std::vector<POSE> & poses, const double delta, std::vector<POSE> & opt_poses);
         bool isStateValid(const ob::State *state);
-        bool check_path( POSE p0, std::vector<POSE> poses );
+        bool check_state( const double * s );
 
         void reset_planner() {
             if( !_random_start_state ) _start_state_set = false;
