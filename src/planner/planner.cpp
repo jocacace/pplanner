@@ -166,8 +166,8 @@ void PATH_PLANNER::init( const double * xbounds, const double * ybounds, const d
 	_si->setStateValidityChecker(std::bind(&PATH_PLANNER::isStateValid, this, std::placeholders::_1 ));
 	_pdef = ob::ProblemDefinitionPtr(new ob::ProblemDefinition(_si));    
 
-    _pdef->setOptimizationObjective( getClearanceObjective(_si) );
-    //_pdef->setOptimizationObjective( getThresholdPathLengthObj( _si ));
+    //_pdef->setOptimizationObjective( getClearanceObjective(_si) );
+    _pdef->setOptimizationObjective( getThresholdPathLengthObj( _si ));
 
     _planner = ob::PlannerPtr(new og::RRTstar(_si));    
     
