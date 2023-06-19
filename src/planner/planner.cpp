@@ -70,18 +70,25 @@ bool PATH_PLANNER::check_state( const double * s ) {
  * \return The state validity (true: free state) or (false: occupied state)
  */
 bool PATH_PLANNER::isStateValid(const ob::State *state) {
-    
+    //_x_bounds
+
+    // cast the abstract state type to the type we expect
+    const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
+
+    // extract the first component of the state and cast it to what we expect
+    const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
+
+    // extract the second component of the state and cast it to what we expect
+    const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+
+    if( pos->values[0] < _x_bounds[0] || pos->values[0] > _x_bounds[1]) return false;
+    if( pos->values[1] < _y_bounds[0] || pos->values[1] > _y_bounds[1]) return false;
+    if( pos->values[2] < _z_bounds[0] || pos->values[2] > _z_bounds[1]) return false;
+
+
+
     if( _tree_obj ) {
 
-        // cast the abstract state type to the type we expect
-        const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
-
-        // extract the first component of the state and cast it to what we expect
-        const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
-
-        // extract the second component of the state and cast it to what we expect
-        const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
-            
         // set the rototranslation of the robot considering the planned state
         fcl::Vec3f translation(pos->values[0],pos->values[1],pos->values[2]);
         fcl::Quaternion3f rotation(rot->w, rot->x, rot->y, rot->z);
@@ -248,7 +255,7 @@ int PATH_PLANNER::optimize_path(const std::vector<POSE> & poses, const double de
  * \return opt_poses: the optimized path 
  * \return int: planned path (1-solved, 0-not solved)
  */
-int PATH_PLANNER::plan(const double & max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
+int PATH_PLANNER::plan(const double & max_t, const double * xbounds, const double * ybounds, const double * zbounds, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
 
     //Planner not correctly initialized
     if( !_start_state_set || !_goal_state_set ) {
@@ -260,6 +267,26 @@ int PATH_PLANNER::plan(const double & max_t, std::vector<POSE> & poses, std::vec
         std::cout << "Problem not correctly set: robot geometry not specified!" << std::endl;
         return -1;
     }
+
+    ob::RealVectorBounds bounds(3);
+
+	bounds.setLow (0,  xbounds[0]);
+	bounds.setHigh(0,  xbounds[1]); //x
+	bounds.setLow (1,  ybounds[0]);
+	bounds.setHigh(1,  ybounds[1]); //y
+	bounds.setLow (2,  zbounds[0]);
+	bounds.setHigh(2,  zbounds[1]); //z
+
+
+    _x_bounds[0] = xbounds[0];
+    _x_bounds[1] = xbounds[1];
+    _y_bounds[0] = ybounds[0];
+    _y_bounds[1] = ybounds[1];
+    _z_bounds[0] = zbounds[0];
+    _z_bounds[1] = zbounds[1];
+
+	_space->as<ob::SE3StateSpace>()->setBounds(bounds);
+
 
     ob::ScopedState<ob::SE3StateSpace> start(_space);		
     ob::ScopedState<ob::SE3StateSpace> goal(_space);

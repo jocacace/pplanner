@@ -111,7 +111,7 @@ class PATH_PLANNER {
 
         PATH_PLANNER();
         void init( const double * xbounds, const double * ybounds, const double * zbounds);
-        int plan(const double & max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses);
+        int plan(const double & max_t, const double * xbounds, const double * ybounds, const double * zbounds, std::vector<POSE> & poses, std::vector<POSE> & opt_poses);
         int optimize_path(const std::vector<POSE> & poses, const double delta, std::vector<POSE> & opt_poses);
         bool isStateValid(const ob::State *state);
         bool check_state( const double * s );
@@ -215,4 +215,8 @@ class PATH_PLANNER {
         fcl::OcTree* _tree;
         std::shared_ptr<fcl::CollisionGeometry> _tree_obj;
         std::shared_ptr<fcl::CollisionGeometry> _Robot;
+
+        double _x_bounds[2];
+        double _y_bounds[2];
+        double _z_bounds[2];
 };
