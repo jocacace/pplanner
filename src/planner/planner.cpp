@@ -71,8 +71,21 @@ bool PATH_PLANNER::check_state( const double * s ) {
  */
 bool PATH_PLANNER::isStateValid(const ob::State *state) {
     
-    if( _tree_obj ) {
+    
+    // cast the abstract state type to the type we expect
+    const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
 
+    // extract the first component of the state and cast it to what we expect
+    const ob::RealVectorStateSpace::StateType *pos = se3state->as<ob::RealVectorStateSpace::StateType>(0);
+
+    // extract the second component of the state and cast it to what we expect
+    const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
+
+    if( pos->values[0] < _x_bounds[0] || pos->values[0] > _x_bounds[1]) return false;
+    if( pos->values[1] < _y_bounds[0] || pos->values[1] > _y_bounds[1]) return false;
+    if( pos->values[2] < _z_bounds[0] || pos->values[2] > _z_bounds[1]) return false;
+    
+    if( _tree_obj ) {
         // cast the abstract state type to the type we expect
         const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
 
@@ -248,8 +261,16 @@ int PATH_PLANNER::optimize_path(const std::vector<POSE> & poses, const double de
  * \return opt_poses: the optimized path 
  * \return int: planned path (1-solved, 0-not solved)
  */
-int PATH_PLANNER::plan(const double & max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
-
+//int PATH_PLANNER::plan(const double & max_t, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
+int PATH_PLANNER::plan(const double & max_t, const double * xbounds, const double * ybounds, const double * zbounds, std::vector<POSE> & poses, std::vector<POSE> & opt_poses) {
+    
+    _x_bounds[0] = xbounds[0];
+    _x_bounds[1] = xbounds[1];
+    _y_bounds[0] = ybounds[0];
+    _y_bounds[1] = ybounds[1];
+    _z_bounds[0] = zbounds[0];
+    _z_bounds[1] = zbounds[1];
+    
     //Planner not correctly initialized
     if( !_start_state_set || !_goal_state_set ) {
         std::cout << "Problem not correctly set: start or goal state not defined!" << std::endl;
@@ -260,6 +281,28 @@ int PATH_PLANNER::plan(const double & max_t, std::vector<POSE> & poses, std::vec
         std::cout << "Problem not correctly set: robot geometry not specified!" << std::endl;
         return -1;
     }
+
+
+    //-3: goal state not valid
+    if( _goal.position.x < xbounds[0] || _goal.position.x > xbounds[1]) {
+
+        std::cout << "X out of bounds: " << _goal.position.x << " (" << xbounds[0] << ", " << xbounds[1] << ")" << std::endl;
+        return -3;
+    }
+    
+    if( _goal.position.y < ybounds[0] || _goal.position.y > ybounds[1]) {
+
+        std::cout << "Y out of bounds: " << _goal.position.y << " (" << ybounds[0] << ", " << ybounds[1] << ")" << std::endl;
+        return -3;
+    }
+    
+    if( _goal.position.z < zbounds[0] || _goal.position.z > zbounds[1]) {
+
+        std::cout << "Z out of bounds: " << _goal.position.z << " (" << zbounds[0] << ", " << zbounds[1] << ")" << std::endl;
+        return -3;
+    }
+
+
 
     ob::ScopedState<ob::SE3StateSpace> start(_space);		
     ob::ScopedState<ob::SE3StateSpace> goal(_space);
