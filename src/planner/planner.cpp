@@ -71,7 +71,7 @@ bool PATH_PLANNER::check_state( const double * s ) {
  */
 bool PATH_PLANNER::isStateValid(const ob::State *state) {
     
-    
+
     // cast the abstract state type to the type we expect
     const ob::SE3StateSpace::StateType *se3state = state->as<ob::SE3StateSpace::StateType>();
 
@@ -81,9 +81,22 @@ bool PATH_PLANNER::isStateValid(const ob::State *state) {
     // extract the second component of the state and cast it to what we expect
     const ob::SO3StateSpace::StateType *rot = se3state->as<ob::SO3StateSpace::StateType>(1);
 
-    if( pos->values[0] < _x_bounds[0] || pos->values[0] > _x_bounds[1]) return false;
-    if( pos->values[1] < _y_bounds[0] || pos->values[1] > _y_bounds[1]) return false;
-    if( pos->values[2] < _z_bounds[0] || pos->values[2] > _z_bounds[1]) return false;
+    if( pos->values[0] < _x_bounds[0] || pos->values[0] > _x_bounds[1]) {
+        //std::cout << "X fault: " << pos->values[0] << " - " << _x_bounds[0] << ", " << _x_bounds[1] << std::endl;
+        return false;
+    }
+    
+    if( pos->values[1] < _y_bounds[0] || pos->values[1] > _y_bounds[1]) {
+
+        //std::cout << "Y fault: " << pos->values[1] << " - " << _y_bounds[0] << ", " << _y_bounds[1] << std::endl;
+        return false;
+    }
+    
+    if( pos->values[2] < _z_bounds[0] || pos->values[2] > _z_bounds[1]) {
+
+        //std::cout << "Z fault: " << pos->values[2] << " - " << _z_bounds[0] << ", " << _z_bounds[1] << std::endl;
+        return false;
+    }
     
     if( _tree_obj ) {
         // cast the abstract state type to the type we expect
@@ -285,23 +298,19 @@ int PATH_PLANNER::plan(const double & max_t, const double * xbounds, const doubl
 
     //-3: goal state not valid
     if( _goal.position.x < xbounds[0] || _goal.position.x > xbounds[1]) {
-
-        std::cout << "X out of bounds: " << _goal.position.x << " (" << xbounds[0] << ", " << xbounds[1] << ")" << std::endl;
+        //std::cout << "X out of bounds: " << _goal.position.x << " (" << xbounds[0] << ", " << xbounds[1] << ")" << std::endl;
         return -3;
     }
     
     if( _goal.position.y < ybounds[0] || _goal.position.y > ybounds[1]) {
-
-        std::cout << "Y out of bounds: " << _goal.position.y << " (" << ybounds[0] << ", " << ybounds[1] << ")" << std::endl;
+        //std::cout << "Y out of bounds: " << _goal.position.y << " (" << ybounds[0] << ", " << ybounds[1] << ")" << std::endl;
         return -3;
     }
     
     if( _goal.position.z < zbounds[0] || _goal.position.z > zbounds[1]) {
-
-        std::cout << "Z out of bounds: " << _goal.position.z << " (" << zbounds[0] << ", " << zbounds[1] << ")" << std::endl;
+        //std::cout << "Z out of bounds: " << _goal.position.z << " (" << zbounds[0] << ", " << zbounds[1] << ")" << std::endl;
         return -3;
     }
-
 
 
     ob::ScopedState<ob::SE3StateSpace> start(_space);		
